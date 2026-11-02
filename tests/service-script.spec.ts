@@ -1,11 +1,12 @@
 /** Tests for scripts/dsh-superagent using a temporary checkout path with spaces and stubbed ps, tmux, and dsh binaries. */
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync }
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync }
   from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import lockfile from 'proper-lockfile'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 
 let root: string
@@ -27,7 +28,10 @@ const started = (...lines: string[]) => writeFileSync(join(root, 'ps-started.txt
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'service script '))
   mkdirSync(join(root, 'scripts')); mkdirSync(join(root, 'bin'))
+  copyFileSync(join(import.meta.dirname, '..', 'scripts', 'dsh-superagent.mjs'), join(root, 'scripts', 'dsh-superagent.mjs'))
   copyFileSync(join(import.meta.dirname, '..', 'scripts', 'dsh-superagent'), join(root, 'scripts', 'dsh-superagent'))
+  // The implementation imports proper-lockfile, which a copied checkout resolves through this link.
+  symlinkSync(join(import.meta.dirname, '..', 'node_modules'), join(root, 'node_modules'), 'dir')
   processes()
   program('ps', `list='${root}/ps.txt'; [ -f '${root}/launched' ] && [ -f '${root}/ps-started.txt' ] && list='${root}/ps-started.txt'
 want=; while [ $# -gt 0 ]; do [ "$1" = -p ] && want=$2; shift; done
@@ -48,7 +52,7 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true })
 })
 function run(...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise(resolve => execFile('python3', [join(root, 'scripts', 'dsh-superagent'), ...args],
+  return new Promise(resolve => execFile(join(root, 'scripts', 'dsh-superagent'), args,
     { env: { ...process.env, PATH: `${join(root, 'bin')}:${process.env.PATH}`, DSH_SUPERAGENT_PROFILE: '', DSH_SUPERAGENT_URL: '' },
       timeout: 20_000 },
     (error, stdout, stderr) => resolve({ code: typeof error?.code === 'number' ? error.code : 0, stdout, stderr })))
@@ -181,16 +185,13 @@ it('restarts the service, and a restart whose graceful stop timed out does not k
 }, 20_000)
 it('refuses a second control operation while one holds the profile\'s lock', async () => {
   mkdirSync(control('superagent'), { recursive: true })
-  const held = join(root, 'held')
-  const holder = spawn('python3', ['-c', `import fcntl, pathlib, time
-lock = open(${JSON.stringify(join(control('superagent'), 'operation.lock'))}, 'a')
-fcntl.flock(lock, fcntl.LOCK_EX)
-pathlib.Path(${JSON.stringify(held)}).touch()
-time.sleep(30)`], { stdio: 'ignore' })
-  sleepers.push(holder)
-  while (!existsSync(held)) await new Promise(resolve => setTimeout(resolve, 50))
-  expect(await run('status')).toMatchObject({ code: 1,
-    stderr: expect.stringContaining('Another dsh-superagent control operation is in progress') })
+  const held = join(control('superagent'), 'operation.lock')
+  writeFileSync(held, '')
+  const release = lockfile.lockSync(held, { realpath: false })
+  try {
+    expect(await run('status')).toMatchObject({ code: 1,
+      stderr: expect.stringContaining('Another dsh-superagent control operation is in progress') })
+  } finally { release() }
 }, 20_000)
 it('refuses to start a service while no process runs it but something answers at its URL', async () => {
   const url = await answering(READY, true)
