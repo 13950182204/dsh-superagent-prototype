@@ -368,6 +368,11 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/sources/github-pull.ts` | The pull request rules: which pull requests a Ticket follows (`claimPull`, `observePull`), the closes it reports to the Engine, and `pullEndNotices`, the chat notice of a Ticket that ended merged or closed |
 | `src/sources/github-channel.ts` | The GitHub Channel: comments and review thread replies, `sent` or `gone` |
 | `src/sources/github-read.ts` | CI snapshots, repository reads, the `github/` resources, and `githubThreadContext`: an Issue's or pull request's conversation by page |
+| `src/sources/gitlab.ts` | The GitLab kind and plugin entry, exported as `./gitlab-watch`: a poll round of the project's Issues and merge requests, the merge requests of open Tickets with their CI, the default branch's pipeline, and subscribed Threads |
+| `src/sources/gitlab-trigger.ts` | GitLab Issues, merge-request bodies, notes, inline discussion notes and pipelines as Triggers, and GitLab addresses |
+| `src/sources/gitlab-merge-request.ts` | The merge request rules: which merge requests a Ticket follows, the closes it reports to the Engine, and the merge GitLab performs |
+| `src/sources/gitlab-channel.ts` | The GitLab Channel: Issue and merge-request notes and discussion replies, `sent` or `gone` |
+| `src/sources/gitlab-read.ts` | CI snapshots, the mergeable rules of GitLab 13.1, repository reads, the `gitlab/` resources, and `gitlabThreadContext`: an Issue's or merge request's conversation by page |
 | `src/sources/feishu.ts` | The Feishu kind and plugin entry, exported as `./feishu-watch` |
 | `src/sources/feishu-trigger.ts` | Feishu messages as Triggers, by one rule for live events, history pages and topic pages |
 | `src/sources/feishu-loops.ts` | The Feishu loops: the event consumer, history recovery, chat names and polling of subscribed topics |
@@ -438,6 +443,8 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/model-surface.spec.ts` | Everything models read: tools, prompts, skills and inputs, checked against the tool schemas, the execution environment and the glossary, within a size budget per role |
 | `tests/deployment.spec.ts`, `tests/environment.spec.ts`, `tests/index.spec.ts` | The plugin configuration and setup, the agent's process environment, the plugin entry |
 | `tests/service-script.spec.ts` | `scripts/dsh-superagent` against fake `ps`, `tmux` and `dsh` |
+| `tests/gitlab.spec.ts` | The GitLab Source on a `SourceContext`: configuration, scope, `find`, the Policy table, execution variables, polls, notes, the close of a merged merge request, CI fingerprints, and health |
+| `tests/gitlab-read.spec.ts`, `tests/gitlab-merge-request.spec.ts` | GitLab reads, and the merge request rules: which one a Ticket follows, its closes, and the merge |
 | `tests/client.spec.tsx`, `tests/navigation.spec.ts`, `tests/controls.spec.tsx` | The client plugin's registration and polling, Session navigation and route memory, the local controls, and the panel's imports, which have no cycle |
 | `tests/panel-overview.spec.tsx`, `panel-source.spec.tsx`, `panel-trigger.spec.tsx`, `panel-eval.spec.tsx`, `panel-execution.spec.tsx` | Each page of the panel, against a fake management API answered by route |
 | `tests/panel-settings.spec.tsx`, `panel-prompts.spec.tsx`, `panel-deployment.spec.tsx`, `panel-panel.spec.tsx` | The settings groups, drafts and history, the prompts, the Deployment page, and the panel's search, glossary and route memory |

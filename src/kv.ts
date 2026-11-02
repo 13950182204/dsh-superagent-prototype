@@ -49,6 +49,15 @@ export const KV = {
     branchCi: record<{ branch?: string; failures?: string[]; revision: number }>('github-branch-ci'),
     ci: family<{ fingerprint: string; revision: number }, [number: number]>('github-ci:') },
   /**
+   * GitLab Source: the project-wide `updated_after` cursor for Issues and merge requests; per-Issue/merge-request read
+   * cursors keyed by the full Thread key; the default branch's last pipeline state and its revision; and per-merge-request
+   * CI fingerprint and revision (`revision` counts reported CI changes so each produces a distinct Trigger ID).
+   */
+  gitlab: { since: record<string>('gitlab-since'),
+    cursor: family<string, [thread: string]>('gitlab-cursor:'),
+    branch: record<{ ref: string; sha: string; status: string; revision: number }>('gitlab-branch'),
+    ci: family<{ fingerprint: string; revision: number }, [thread: string]>('gitlab-ci:') },
+  /**
    * Feishu Source: known chats (`true` for direct messages); per-chat history cursor and active topics mapped from topic ID
    * to last-seen timestamp; and per-polled-thread seen message IDs and initialization flag.
    */

@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process'
 import { basename } from 'node:path'
 import { promisify } from 'node:util'
 import { z } from 'zod'
-import type { Deployment } from '../deployment.ts'
+import { githubOf, type Deployment } from '../deployment.ts'
 
 const exec = promisify(execFile)
 const TIMEOUT_MS = 90_000
@@ -73,7 +73,7 @@ export class Commands {
     } catch (error) { throw commandError(error, program) }
   }
   /** Runs the agent's GitHub CLI and parses its JSON output; callers should prefer `api`, which is restricted to the configured repository and validates output. */
-  async gh<T>(args: string[]): Promise<T> { return JSON.parse(await this.run(this.deployment.github.cli, args)) as T }
+  async gh<T>(args: string[]): Promise<T> { return JSON.parse(await this.run(githubOf(this.deployment).cli, args)) as T }
   /**
    * Calls the GitHub API on a path within the configured repository, validating JSON output when a schema is provided
    * or returning raw CLI output (such as raw files or `--include` headers) when omitted.
@@ -82,7 +82,7 @@ export class Commands {
   async api<T>(schema: z.ZodType<T>, path: string, ...flags: string[]): Promise<T>
   async api(path: string, ...flags: string[]): Promise<string>
   async api<T>(schema: z.ZodType<T> | string, ...rest: string[]): Promise<T | string> {
-    if (typeof schema === 'string') return this.run(this.deployment.github.cli, ['api', this.path(schema), ...rest])
+    if (typeof schema === 'string') return this.run(githubOf(this.deployment).cli, ['api', this.path(schema), ...rest])
     const [path = '', ...flags] = rest
     return schema.parse(await this.gh(['api', this.path(path), ...flags]))
   }
@@ -112,4 +112,45 @@ export class Commands {
   }
   /** Runs `git` on PATH using the agent's isolated git environment and credential helper. */
   async git(args: string[], cwd: string): Promise<string> { return this.run('git', args, cwd) }
+  /** The resolved GitLab account; throws while the GitLab Source is unconfigured. */
+  get gitlab(): NonNullable<Deployment['gitlab']> {
+    const gitlab = this.deployment.gitlab
+    if (!gitlab) throw new Error('The GitLab Source is not configured')
+    return gitlab
+  }
+  /** The configured project as an API path segment; the numeric ID avoids encoding subgroup separators. */
+  get gitlabProject(): string { return String(this.gitlab.projectId) }
+  /**
+   * Calls the GitLab API on a path against the configured project, validating JSON output when a schema is provided
+   * or returning raw output (such as a raw file) when omitted.
+   * @throws CliError with GitLab's HTTP status as `code` on failure.
+   */
+  async gitlabApi<T>(schema: z.ZodType<T>, path: string, ...flags: string[]): Promise<T>
+  async gitlabApi(path: string, ...flags: string[]): Promise<string>
+  async gitlabApi<T>(schema: z.ZodType<T> | string, ...rest: string[]): Promise<T | string> {
+    if (typeof schema === 'string') return this.run(this.gitlab.cli, this.gitlabArgs(schema, rest))
+    const [path = '', ...flags] = rest
+    const output = await this.run(this.gitlab.cli, this.gitlabArgs(path, flags))
+    return schema.parse(JSON.parse(output) as unknown)
+  }
+  /**
+   * Fetches all pages of a GitLab API list within the configured project, skipping items that fail schema validation.
+   * `glab api --paginate` concatenates one JSON document per page, so NDJSON is requested and each line parsed.
+   */
+  async gitlabPages<T>(item: z.ZodType<T>, path: string, tally?: Tally): Promise<T[]> {
+    const output = await this.run(this.gitlab.cli, this.gitlabArgs(path, ['--paginate', '--output', 'ndjson']))
+    const values = output.split('\n').filter(line => line.trim()).map(line => {
+      try { return JSON.parse(line) as unknown } catch { return undefined }
+    })
+    const list = values.flatMap(value => Array.isArray(value) ? value : value === undefined ? [] : [value])
+    return validItems(item, list, tally)
+  }
+  /** Reads a raw body from the GitLab API, such as a repository file, without parsing it as JSON. */
+  async gitlabRaw(path: string): Promise<string> { return this.run(this.gitlab.cli, this.gitlabArgs(path, [])) }
+  private gitlabArgs(path: string, flags: string[]): string[] { return ['api', '--hostname', this.gitlab.host, this.gitlabPath(path), ...flags] }
+  private gitlabPath(path: string): string {
+    const outside = /^\/|^[a-z]+:|(^|\/)\.\.?(\/|\?|$)/i.test(path)
+    if (outside) throw new Error('GitLab calls are restricted to the configured project')
+    return path
+  }
 }

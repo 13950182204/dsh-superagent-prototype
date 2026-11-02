@@ -17,7 +17,7 @@ const MARKER = '# Written by dsh-superagent on every start; edits are lost.'
 /** Markers of files written under the project's earlier names (`dsh-tag`, `dsh-go`, `dsh-freelancer`), which `dsh-superagent` owns and replaces too. */
 const LEGACY_MARKERS = ['dsh-tag', 'dsh-go', 'dsh-freelancer'].map(name => `# Written by ${name} on every start; edits are lost.`)
 /** Commands workers need, which `blockedCommands` cannot block: the shims and git. */
-export const WORKER_COMMANDS: readonly string[] = ['gh', 'git', 'lark-cli']
+export const WORKER_COMMANDS: readonly string[] = ['gh', 'glab', 'git', 'lark-cli']
 export const workerBin = (stateDir: string): string => join(stateDir, 'worker-bin')
 export const workerGitConfig = (stateDir: string): string => join(stateDir, 'worker-gitconfig')
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
@@ -28,8 +28,9 @@ export const credentialHelper = (cli: string): string => `!${shellQuote(gitPath(
  * The CLI accounts git may authenticate as, each with the URL prefix git reads the credential helper from.
  * The GitHub account always takes one entry; a GitLab account adds its own host when that Source is configured.
  */
-export function credentialAccounts(deployment: Pick<Deployment, 'github'>): Array<{ url: string; cli: string }> {
-  return [{ url: 'https://github.com', cli: deployment.github.cli }]
+export function credentialAccounts(deployment: Pick<Deployment, 'github' | 'gitlab'>): Array<{ url: string; cli: string }> {
+  return [...deployment.github ? [{ url: 'https://github.com', cli: deployment.github.cli }] : [],
+    ...deployment.gitlab ? [{ url: deployment.gitlab.url, cli: deployment.gitlab.cli }] : []]
 }
 
 
@@ -81,8 +82,8 @@ async function own(file: string, text: string, mode = 0o644): Promise<void> {
  * A POSIX shim is a `sh` script; a Windows shim is a `.cmd` batch file, because `cmd` and PowerShell resolve `.cmd` by name.
  * Both strip the shim directory from PATH before running the real CLI so a wrapper script that calls `gh` or `lark-cli` by name reaches the binary.
  */
-export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' | 'github' | 'feishu'>, blockedCommands: readonly string[]): Promise<void> {
-  const { stateDir, github, feishu } = deployment
+export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' | 'github' | 'gitlab' | 'feishu'>, blockedCommands: readonly string[]): Promise<void> {
+  const { stateDir, github, gitlab, feishu } = deployment
   const dir = workerBin(stateDir)
   await mkdir(dir, { recursive: true })
   const before = await readdir(dir)
@@ -116,14 +117,23 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
     'exit /b %ERRORLEVEL%',
   ].join('\r\n')
   const batchFail = (message: string): string => `echo ${message} 1>&2\r\nexit /b 1`
-  await shim('gh', posixRun(github.cli), batchRun(github.cli))
+  if (github) await shim('gh', posixRun(github.cli), batchRun(github.cli))
+  else {
+    const message = 'gh is unavailable: this installation has no GitHub Source.'
+    await shim('gh', posixFail(message), batchFail(message))
+  }
+  if (gitlab) await shim('glab', posixRun(gitlab.cli), batchRun(gitlab.cli))
+  else {
+    const message = 'glab is unavailable: this installation has no GitLab Source.'
+    await shim('glab', posixFail(message), batchFail(message))
+  }
   if (feishu) await shim('lark-cli', posixRun(feishu.cli), batchRun(feishu.cli))
   else {
     const message = 'lark-cli is unavailable: this installation has no Feishu bot.'
     await shim('lark-cli', posixFail(message), batchFail(message))
   }
   for (const name of new Set(blockedCommands.filter(name => !WORKER_COMMANDS.includes(name)))) {
-    const message = `${name} is blocked in this installation; use gh, which acts as ${github.login}.`
+    const message = `${name} is blocked in this installation; use ${github ? `gh, which acts as ${github.login}` : `glab, which acts as ${gitlab?.login ?? 'the agent'}`}.`
     await shim(name, posixFail(message), batchFail(message))
   }
   for (const name of before) if (!kept.has(name)) await unlink(join(dir, name))
@@ -162,7 +172,7 @@ export async function runAsWorker(subprocess: SubprocessRuntime, argv: string[],
 }
 
 /** Verifies that worker git invocations resolve each configured account's credential helper from the worker git configuration. */
-export async function verifyEnvironment(deployment: Pick<Deployment, 'github' | 'stateDir'>, subprocess: SubprocessRuntime, signal: AbortSignal): Promise<void> {
+export async function verifyEnvironment(deployment: Pick<Deployment, 'github' | 'gitlab' | 'stateDir'>, subprocess: SubprocessRuntime, signal: AbortSignal): Promise<void> {
   const { stateDir } = deployment
   const expected = `file:${gitPath(workerGitConfig(stateDir))}`
   for (const { url, cli } of credentialAccounts(deployment)) {
