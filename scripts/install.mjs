@@ -5,7 +5,7 @@
  * `install` creates the profile, writes the plugin configuration into it, builds this checkout and links it as a plugin.
  * `doctor` re-checks an installation, and `uninstall` removes what install wrote. Every write stays inside $DSH_HOME.
  */
-import { execFileSync, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
@@ -63,11 +63,16 @@ function parse(argv) {
 
 /** Runs a program and returns its output; with `quiet` the child's output is captured instead of shown. */
 function run(program, args, { cwd, quiet = false, env = process.env } = {}) {
-  if (quiet) return execFileSync(program, args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-  const result = spawnSync(program, args, { cwd, env, stdio: 'inherit' })
+  // Windows cannot spawn a .cmd or .bat file directly, and DSH's own command is a .CMD shim. cmd.exe needs the whole line
+  // inside one pair of quotes (with /s it strips them and keeps the inner ones), so the arguments go through verbatim.
+  const shell = isWindows && /\.(?:cmd|bat)$/i.test(program)
+  const line = `"${program}" ${args.map(argument => `"${String(argument).replaceAll('"', '\\"')}"`).join(' ')}`
+  const actual = shell ? [process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${line}"`], { windowsVerbatimArguments: true }] : [program, args, {}]
+  const result = spawnSync(actual[0], actual[1], { ...actual[2], ...cwd ? { cwd } : {}, ...env ? { env } : {},
+    ...quiet ? { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] } : { stdio: 'inherit' } })
   if (result.error) fail(`${program} could not run: ${result.error.message}`)
-  if (result.status !== 0) fail(`${[program, ...args].join(' ')} exited with ${result.status}`)
-  return ''
+  if (result.status !== 0) fail(`${[program, ...args].join(' ')} exited with ${result.status}${quiet && result.stderr ? `: ${String(result.stderr).trim()}` : ''}`)
+  return quiet ? String(result.stdout ?? '') : ''
 }
 
 /** Finds a program on PATH, honouring PATHEXT on Windows. */
@@ -95,12 +100,18 @@ function pnpmCommand(dsh) {
   if (process.env.DSH_PNPM) return [process.execPath, [process.env.DSH_PNPM]]
   const found = which('pnpm') ?? which('pnpm.cjs')
   if (found) return [found, []]
-  const guess = join(dirname(dsh), '..', 'runtime')
-  for (const root of [guess, join(dirname(dsh), 'resources', 'runtime')]) {
-    try {
-      const runtime = readdirSync(root).map(name => join(root, name, 'dependencies', 'pnpm', 'bin', 'pnpm.cjs')).find(existsSync)
-      if (runtime) return [process.execPath, [runtime]]
-    } catch { /* not this layout */ }
+  // DSH ships pnpm beside its runtime; find it from the dsh shim by walking up to the runtime directory that holds it.
+  let directory = dirname(dsh)
+  for (let depth = 0; depth < 6; depth += 1) {
+    const candidates = []
+    for (const runtime of [directory, join(directory, 'runtime'), join(directory, 'primary-runtime'), join(directory, 'resources', 'runtime')]) {
+      try {
+        for (const name of readdirSync(runtime)) candidates.push(join(runtime, name, 'dependencies', 'pnpm', 'bin', 'pnpm.cjs'))
+      } catch { /* not this layout */ }
+    }
+    const found = candidates.find(existsSync)
+    if (found) return [process.execPath, [found]]
+    directory = dirname(directory)
   }
   return undefined
 }

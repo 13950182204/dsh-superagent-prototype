@@ -42,3 +42,13 @@ container. Do not set it on the operator's own profile: worker Sessions inherit 
 | Sources, Tickets, workers | yes | no |
 | Changes this process's environment | yes, in its own profile | never |
 | Uninstall | `scripts/install.mjs uninstall` | remove the plugin in the panel |
+
+## Windows
+
+The installer and the service manager run on Windows as well as on POSIX: the installer calls DSH's own `dsh.CMD` through
+`cmd.exe`, resolves the pnpm DSH ships beside its runtime, and writes a `dsh-superagent.cmd` next to the launcher. Keep
+the checkout on a Windows path (`C:\...`); `cmd.exe` cannot use a `\\wsl.localhost\...` directory as its working
+directory, and Node.js cannot load the dependencies installed on the other side of that share. `install --from <git URL>`
+clones into `%USERPROFILE%\.dsh\plugins`, which satisfies both.
+
+`doctor` checks the pieces a Source needs: `glab` for GitLab, `gh` for GitHub. Neither is installed by the installer.
