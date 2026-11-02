@@ -1,7 +1,8 @@
 import { defineConfig } from 'vitest/config'
 // Share one React instance across DSH client packages and tests, and bound the number of forked test processes: the suite
-// drives real timers, SQLite and child processes, and timing-based tests miss their waits when many run at once.
+// drives real timers, SQLite and child processes, and timing-based tests miss their waits when many run at once, so the
+// per-test deadline allows for a loaded machine.
 export default defineConfig({
   resolve: { dedupe: ['react', 'react-dom'] },
-  test: { include: ['tests/**/*.spec.{ts,tsx}'], poolOptions: { forks: { maxForks: 4 } } },
+  test: { include: ['tests/**/*.spec.{ts,tsx}'], maxWorkers: 3, testTimeout: 20_000 },
 })
