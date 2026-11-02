@@ -6,6 +6,7 @@ export const SETUP_PROBLEMS = {
   foreignFile: ['deployment', '{file} was not written by dsh-superagent; move it, or choose another state directory.'],
   gitTooOld: ['deployment', 'git does not read the github.com credential configuration dsh-superagent writes; dsh-superagent needs git 2.32 or later.'],
   environmentFailed: ['deployment', 'Preparing the agent environment failed.'],
+  sharedProfile: ['deployment', 'DSH runs this dsh-superagent inside the {profile} profile, which the operator also uses; it would change that profile\'s shell environment. Run the quickstart installer, which creates a dedicated profile, as docs/011-quickstart.md describes.'],
   sourceUnset: ['github', 'Neither the GitHub nor the GitLab Source is configured; fill in one of them in the Source settings.'],
   repositoryUnset: ['github', 'The GitHub Source names no repository.'],
   agentCliUnset: ['github', 'The agent GitHub CLI is not set.'],

@@ -466,6 +466,7 @@ const TEXT = {
   'promptPart.skill/feishu': ['飞书技能', 'Feishu skill'],
   'promptPart.skill/github': ['GitHub 技能', 'GitHub skill'],
   'promptPart.skill/gitlab': ['GitLab 技能', 'GitLab skill'],
+  'setup.sharedProfile': ['dsh-superagent 正运行在 {profile} profile 里，那是你自己也在用的 profile；它会改掉那个进程的 shell 环境。请运行 quickstart 安装器，它会建一个专用 profile（见 docs/011-quickstart.md）。', 'dsh-superagent runs inside the {profile} profile, which the operator also uses; it would change that process\'s shell environment. Run the quickstart installer, which creates a dedicated profile, as docs/011-quickstart.md describes.'],
   'promptPart.runtime/environment': ['执行环境', 'Execution environment'],
   promptViewEdit: ['编辑', 'Edit'],
   promptViewFull: ['完整提示词', 'Full prompt'],

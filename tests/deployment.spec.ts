@@ -40,13 +40,16 @@ afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
 vi.setConfig({ testTimeout: 30_000 })
 
 describe('configuration schema', () => {
-  it('requires only the state directory and reads the editable fields through references', () => {
-    expect(() => Config({})).toThrow('stateDir')
-    const read = machineOf(Config({ stateDir: join(dir, 'state') }))
+  it('needs no configuration at all, and reads the editable fields through references', () => {
+    // A panel install writes no configuration: the state directory defaults inside the DSH home, and the profile stays shared.
+    const bare = machineOf(Config({}))
+    expect(bare.stateDir.endsWith(join('state', 'superagent'))).toBe(true)
+    expect(bare.allowSharedProfile).toBe(false)
+    const read = machineOf(Config({ stateDir: join(dir, 'state'), allowSharedProfile: true }))
     // Limits are volatile references that the loader updates in place and callers read when used.
     expect({ ...read, promptMaxChars: read.promptMaxChars.get(), admissionContextMaxPages: read.admissionContextMaxPages.get(),
       admissionContextTimeoutMs: read.admissionContextTimeoutMs.get() })
-      .toEqual({ stateDir: join(dir, 'state'), promptMaxChars: 100000, admissionContextMaxPages: 10, admissionContextTimeoutMs: 15000 })
+      .toEqual({ stateDir: join(dir, 'state'), allowSharedProfile: true, promptMaxChars: 100000, admissionContextMaxPages: 10, admissionContextTimeoutMs: 15000 })
     expect(() => Config(minimal({ stateDir: 'relative/dir' }))).toThrow()
     expect(() => Config(minimal({ stateDir: '~/dir' }))).toThrow()
   })

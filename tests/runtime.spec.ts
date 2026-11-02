@@ -868,6 +868,17 @@ it('reports each setup problem where the operator fixes it, and checks the agent
   expect(next.feishuProblem).toMatchObject({ place: 'feishu', code: 'feishuUserIdentity', values: { mode: 'off' } })
 })
 
+it('waits for a dedicated profile instead of changing the environment of a profile the operator also uses', async () => {
+  const next = await restart({ allowSharedProfile: false })
+  await next.ready
+  expect(next.configured()).toBe(false)
+  expect(next.setupProblem).toMatchObject({ place: 'deployment', code: 'sharedProfile' })
+  // Nothing of the worker environment reached this process, and the panel still answers with the problem.
+  expect(process.env.GIT_CONFIG_GLOBAL).not.toBe(join(directory, 'worker-gitconfig'))
+  expect((process.env.PATH ?? '').split(':')).not.toContain(join(directory, 'worker-bin'))
+  expect((await api('GET', 'state')).body).toMatchObject({ setup: { problem: { code: 'sharedProfile' } } })
+})
+
 it('reports a failure to write the agent environment as environmentFailed and leaves this process\'s environment as it was', async () => {
   await runtime.stop()
   // The shim directory cannot be made: a file has its name.

@@ -3,6 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { UserError } from '../core/index.ts'
 import { SETUP_FIELDS, resolveDeployment, resolveFeishuBot, resolveGitlab, workerProbe, type Deployment, type Machine } from '../deployment.ts'
 import { agentVariables, applyEnvironment, verifyEnvironment, withoutDirectory, workerBin, writeEnvironment } from '../infra/environment.ts'
+import { profileName, sharedProfile } from '../infra/profile.ts'
 import type { Settings, SettingsBlock } from '../policy.ts'
 import { SetupError, type SetupProblem } from '../setup.ts'
 
@@ -81,6 +82,11 @@ export class Setup {
     // Every run clears the partial problems, so a Source that is fixed is no longer reported as unavailable.
     this.feishuProblem = undefined
     this.gitlabProblem = undefined
+    // The worker environment is this process's environment, so a profile the operator also uses is not changed: the panel
+    // and the setup checks work there, and Tickets wait for a dedicated profile.
+    if (!machine.allowSharedProfile && sharedProfile(profileName())) {
+      throw new SetupError('sharedProfile', { profile: profileName() ?? 'current' })
+    }
     // A deployment may name either repository source, or both; each is verified only when it is configured.
     const named = (config: Record<string, unknown> | undefined): boolean => Object.values(config ?? {}).some(value => String(value ?? '').trim() !== '')
     const githubConfig = settings.sources.github?.config

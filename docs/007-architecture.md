@@ -357,6 +357,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/infra/environment.ts` | The agent's process environment: command shims, the git configuration and credential helper, `runAsWorker`, and the checks of the environment and of a Ticket's directory |
 | `src/infra/paths.ts` | The package's root, where packaged files are, and the path comparisons the worker environment makes: `sameDirectory`, `withoutDirectory` and `gitPath` |
 | `src/infra/shell.ts` | `which`, the executable search of each platform, `extensions`, `usable`, and `prepareShell`, the shell that runs a ticket's prepare command: `sh` on POSIX, and on Windows PowerShell, `bash`, or `cmd` |
+| `src/infra/profile.ts` | Which DSH profile this process serves, and whether that profile is one the operator also works in |
 | `src/infra/text.ts` | Word counts and the chat message limit, `fill` and `sameName` |
 | `src/infra/health.ts` | The `HealthBoard`, every part's health entry, each claimed by its one writer |
 | `src/sources/kind.ts` | The `SourceKind` protocol |
@@ -442,6 +443,8 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/cards.spec.ts` | The rules the built-in text must state, file by file |
 | `tests/model-surface.spec.ts` | Everything models read: tools, prompts, skills and inputs, checked against the tool schemas, the execution environment and the glossary, within a size budget per role |
 | `tests/deployment.spec.ts`, `tests/environment.spec.ts`, `tests/index.spec.ts` | The plugin configuration and setup, the agent's process environment, the plugin entry |
+| `tests/profile.spec.ts` | Which DSH profile the plugin reads off the command line or the environment, and which profiles count as the operator's |
+| `tests/install.spec.ts` | The quickstart installer: what it would do, what it refuses, and that it writes only inside the DSH home |
 | `tests/service-script.spec.ts` | `scripts/dsh-superagent` against fake `ps`, `tmux` and `dsh` |
 | `tests/gitlab.spec.ts` | The GitLab Source on a `SourceContext`: configuration, scope, `find`, the Policy table, execution variables, polls, notes, the close of a merged merge request, CI fingerprints, and health |
 | `tests/gitlab-read.spec.ts`, `tests/gitlab-merge-request.spec.ts` | GitLab reads, and the merge request rules: which one a Ticket follows, its closes, and the merge |
