@@ -37,8 +37,8 @@ const fail = (message) => { throw new Error(message) }
 
 function parse(argv) {
   const options = { command: 'install', profile: 'superagent', from: '', port: 3082, stateDir: '', dsh: '', dryRun: false,
-    force: false, keepState: false, purgeProfile: false, tools: false }
-  const flags = { '--dry-run': 'dryRun', '--force': 'force', '--keep-state': 'keepState', '--purge-profile': 'purgeProfile', '--tools': 'tools' }
+    force: false, keepState: false, purgeProfile: false }
+  const flags = { '--dry-run': 'dryRun', '--force': 'force', '--keep-state': 'keepState', '--purge-profile': 'purgeProfile' }
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
     if (argument === '-h' || argument === '--help') { log(USAGE); process.exit(0) }
